@@ -1,54 +1,53 @@
 package me.helight.pernotia;
 
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.inject.Guice;
+import com.google.inject.Inject;
+import com.google.inject.Injector;
 import me.helight.pernotia.database.Person;
 import me.helight.pernotia.database.PersonDao;
-import org.bouncycastle.util.io.pem.PemWriter;
+import me.helight.pernotia.modules.CommonModule;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicReference;
 
-public interface PerNotia {
+public abstract class PerNotia {
 
-    ExecutorService POOL = MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
-    AtomicReference<PerNotia> instance = new AtomicReference<>();
-    PersonDao personDao = new PersonDao();
+    public static final ExecutorService POOL = MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
 
-    static PerNotia getPerNotia() {
-        PerNotia perNotia = instance.get();
+    public static Injector injector;
 
-        if (perNotia == null) {
-            throw new NullPointerException("No instance of PerNotia is currently active");
-        }
+    @Inject
+    private LoginVerify loginVerify;
 
-        return perNotia;
+    @Inject
+    private PersonDao personDao;
+
+    public final void hook() {
+        injector = Guice.createInjector(new CommonModule(this));
+        injector.injectMembers(this);
     }
 
-    default void hook() {
-        PerNotia.instance.set(this);
-    }
-
-    default void handleInvalidUuid(Person person) {
+    public void handleInvalidUuid(Person person) {
 
     }
 
-    default void handleRegister(Person person) {
+    public void handleRegister(Person person) {
         personDao.save(person);
     }
 
-    default void handleConnect(Person person) {
-        LoginVerify.verify(person);
+    public void handleConnect(Person person) {
+        loginVerify.verify(person);
     }
 
-    default void handleDisconnect(Person person) {
-
-    }
-
-    default void handleVerifyError(Person person) {
+    public void handleDisconnect(Person person) {
 
     }
 
-    void sendMessage(Person person, String message);
+    public void handleVerifyError(Person person) {
+
+    }
+
+    public abstract void sendMessage(Person person, String message);
 
 }

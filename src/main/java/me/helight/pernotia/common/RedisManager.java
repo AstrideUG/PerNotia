@@ -9,13 +9,11 @@ import org.redisson.config.Config;
 
 public class RedisManager {
 
-    private static RedisManager instance;
 
     @Getter
     private RedissonClient redissonClient;
 
     public RedisManager() {
-        instance = this;
         init();
     }
 
@@ -32,14 +30,5 @@ public class RedisManager {
         Config config = new Config();
         config.useSingleServer().setAddress("redis://"+redisConfig.getHost()+":"+redisConfig.getPort()).setPassword(redisConfig.getPassword());
         redissonClient = (Redisson.create(config));
-    }
-
-
-    public static RedisManager getInstance() {
-        if (instance == null) {
-            return new RedisManager();
-        } else {
-            return instance;
-        }
     }
 }

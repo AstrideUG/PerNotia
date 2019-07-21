@@ -9,18 +9,24 @@ import net.md_5.bungee.api.plugin.Plugin;
 
 import java.lang.reflect.Proxy;
 
-public class PerNotiaBungeeImpl extends Plugin implements PerNotia {
+public class PerNotiaBungeeImpl extends Plugin {
+
+    private PerNotia perNotia;
 
     @Override
     public void onEnable() {
-        hook();
+        perNotia = new PerNotiaImpl();
+        perNotia.hook();
     }
 
-    @Override
-    public void sendMessage(Person person, String message) {
-        for (ProxiedPlayer player : ProxyServer.getInstance().getPlayers()) {
-            if (player.getUniqueId().toString().equals(person.getUuid())) {
-                player.sendMessage(TextComponent.fromLegacyText(message));
+    public class PerNotiaImpl extends PerNotia {
+
+        @Override
+        public void sendMessage(Person person, String message) {
+            for (ProxiedPlayer player : ProxyServer.getInstance().getPlayers()) {
+                if (player.getUniqueId().toString().equals(person.getUuid())) {
+                    player.sendMessage(TextComponent.fromLegacyText(message));
+                }
             }
         }
     }

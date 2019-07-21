@@ -9,18 +9,24 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.UUID;
 
-public class PerNotiaSpigotImpl extends JavaPlugin implements PerNotia {
+public class PerNotiaSpigotImpl extends JavaPlugin {
+
+    private PerNotia perNotia;
 
     @Override
     public void onEnable() {
-        hook();
+        perNotia = new PerNotiaImpl();
+        perNotia.hook();
     }
 
-    @Override
-    public void sendMessage(Person person, String message) {
-        OfflinePlayer player = Bukkit.getOfflinePlayer(UUID.fromString(person.getUuid()));
-        if (player.isOnline()) {
-            ((Player)player).sendMessage(message);
+    public class PerNotiaImpl extends PerNotia {
+
+        @Override
+        public void sendMessage(Person person, String message) {
+            OfflinePlayer player = Bukkit.getOfflinePlayer(UUID.fromString(person.getUuid()));
+            if (player.isOnline()) {
+                ((Player)player).sendMessage(message);
+            }
         }
     }
 }

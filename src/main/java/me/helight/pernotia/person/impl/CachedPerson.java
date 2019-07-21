@@ -1,6 +1,8 @@
 package me.helight.pernotia.person.impl;
 
+import com.google.inject.Inject;
 import me.helight.ccom.info.ThreadBlocking;
+import me.helight.pernotia.PerNotia;
 import me.helight.pernotia.common.RedisManager;
 import me.helight.pernotia.database.Person;
 import me.helight.pernotia.person.DataAccessPerson;
@@ -12,7 +14,11 @@ public class CachedPerson extends DataAccessPerson {
 
     public CachedPerson(Person person) {
         super(person);
+        PerNotia.injector.injectMembers(this);
     }
+
+    @Inject
+    private RedisManager redisManager;
 
     /**
      * Fetches a value from the temporary datasource
@@ -24,7 +30,7 @@ public class CachedPerson extends DataAccessPerson {
     @SuppressWarnings("unchecked")
     @ThreadBlocking
     public <K> K get(String field, Class<K> clazz) {
-        Object object = RedisManager.getInstance().getRedissonClient().getMap("pernotia_" + person.getUuid()).get(field);
+        Object object = redisManager.getRedissonClient().getMap("pernotia_" + person.getUuid()).get(field);
         return object == null ? null : (K) object;
     }
 
@@ -37,9 +43,9 @@ public class CachedPerson extends DataAccessPerson {
     @ThreadBlocking
     public void set(String field, @Nullable Object value) {
         if (value == null) {
-            RedisManager.getInstance().getRedissonClient().getMap("pernotia_" + person.getUuid()).remove(field);
+            redisManager.getRedissonClient().getMap("pernotia_" + person.getUuid()).remove(field);
         } else {
-            RedisManager.getInstance().getRedissonClient().getMap("pernotia_" + person.getUuid()).put(field,value);
+            redisManager.getRedissonClient().getMap("pernotia_" + person.getUuid()).put(field,value);
         }
     }
 
@@ -47,7 +53,7 @@ public class CachedPerson extends DataAccessPerson {
      * Returns the raw Redisson-{@link RMap} corresponding to the given player
      */
     public RMap getMap() {
-        return RedisManager.getInstance().getRedissonClient().getMap("pernotia_" + person.getUuid());
+        return redisManager.getRedissonClient().getMap("pernotia_" + person.getUuid());
     }
 
 }
