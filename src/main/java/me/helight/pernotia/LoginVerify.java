@@ -1,34 +1,31 @@
 package me.helight.pernotia;
 
-import com.google.inject.Inject;
 import me.helight.ccom.info.NoAPI;
 import me.helight.ccom.info.ThreadBlocking;
 import me.helight.pernotia.database.Person;
-import me.helight.pernotia.database.PersonDao;
-import sun.rmi.runtime.Log;
+import me.helight.pernotia.database.GeneralPersonDao;
 
 public class LoginVerify {
 
-    private final PersonDao personDao;
+    private GeneralPersonDao generalPersonDao;
 
-    private final PerNotia perNotia;
+    private PerNotia perNotia;
 
-    @Inject
-    public LoginVerify(PersonDao personDao, PerNotia perNotia) {
-        this.personDao = personDao;
+    public LoginVerify(GeneralPersonDao generalPersonDao, PerNotia perNotia) {
+        this.generalPersonDao = generalPersonDao;
         this.perNotia = perNotia;
     }
 
     @ThreadBlocking
     @NoAPI
     private VerificationResult check(Person person) {
-        if (personDao.exists(person)) return VerificationResult.PASS;
-        boolean existsName = personDao.existsName(person);
-        boolean existsUuid = personDao.existsUuid(person);
+        if (generalPersonDao.exists(person)) return VerificationResult.PASS;
+        boolean existsName = generalPersonDao.existsName(person);
+        boolean existsUuid = generalPersonDao.existsUuid(person);
 
         if (!existsName && !existsUuid) {
             return VerificationResult.NOT_REGISTERED;
-        } else if (!existsName) {
+        } else if (existsUuid) {
             return VerificationResult.CHANGED_NAME;
         } else {
             return VerificationResult.INVALID_UUID;
@@ -44,11 +41,14 @@ public class LoginVerify {
                     break;
                 case INVALID_UUID:
                     perNotia.handleInvalidUuid(person);
+                    perNotia.handleRegister(person);
+                    generalPersonDao.changeName(person.getUuid(), person.getName());
                     break;
                 case CHANGED_NAME:
-                    personDao.changeName(person.getUuid(), person.getName());
+                    generalPersonDao.changeName(person.getUuid(), person.getName());
                     break;
                 default:
+                    perNotia.successfulLogin(person);
                     break;
             }
         });

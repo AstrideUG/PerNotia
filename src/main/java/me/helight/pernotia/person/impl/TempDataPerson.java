@@ -3,22 +3,26 @@ package me.helight.pernotia.person.impl;
 import com.google.inject.Inject;
 import me.helight.ccom.info.ThreadBlocking;
 import me.helight.pernotia.PerNotia;
-import me.helight.pernotia.common.RedisManager;
+import me.helight.pernotia.configuration.PerNotiaConfiguration;
 import me.helight.pernotia.database.Person;
 import me.helight.pernotia.person.DataAccessPerson;
 import org.redisson.api.RMap;
+import org.redisson.api.RedissonClient;
 
 import javax.annotation.Nullable;
 
-public class CachedPerson extends DataAccessPerson {
+public class TempDataPerson extends DataAccessPerson {
 
-    public CachedPerson(Person person) {
+    public TempDataPerson(Person person) {
         super(person);
         PerNotia.injector.injectMembers(this);
     }
 
     @Inject
-    private RedisManager redisManager;
+    private RedissonClient redissonClient;
+
+    @Inject
+    private PerNotiaConfiguration configuration;
 
     /**
      * Fetches a value from the temporary datasource
@@ -30,7 +34,7 @@ public class CachedPerson extends DataAccessPerson {
     @SuppressWarnings("unchecked")
     @ThreadBlocking
     public <K> K get(String field, Class<K> clazz) {
-        Object object = redisManager.getRedissonClient().getMap("pernotia_" + person.getUuid()).get(field);
+        Object object = redissonClient.getMap(getKey()).get(field);
         return object == null ? null : (K) object;
     }
 
@@ -42,10 +46,11 @@ public class CachedPerson extends DataAccessPerson {
      */
     @ThreadBlocking
     public void set(String field, @Nullable Object value) {
+        RMap<Object, Object> map = redissonClient.getMap(getKey());
         if (value == null) {
-            redisManager.getRedissonClient().getMap("pernotia_" + person.getUuid()).remove(field);
+            map.remove(field);
         } else {
-            redisManager.getRedissonClient().getMap("pernotia_" + person.getUuid()).put(field,value);
+            map.put(field, value);
         }
     }
 
@@ -53,7 +58,13 @@ public class CachedPerson extends DataAccessPerson {
      * Returns the raw Redisson-{@link RMap} corresponding to the given player
      */
     public RMap getMap() {
-        return redisManager.getRedissonClient().getMap("pernotia_" + person.getUuid());
+        return redissonClient.getMap(getKey());
     }
 
+    public String getKey() {
+        return configuration.getRedisMapPrefix() + person.getUuid();
+    }
+
+    public void t() {
+    }
 }

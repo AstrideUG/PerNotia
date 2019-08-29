@@ -4,20 +4,20 @@ import com.google.inject.Inject;
 import me.helight.ccom.info.ThreadBlocking;
 import me.helight.pernotia.PerNotia;
 import me.helight.pernotia.database.Person;
-import me.helight.pernotia.database.PersonDao;
+import me.helight.pernotia.database.GeneralPersonDao;
 import me.helight.pernotia.person.DataAccessPerson;
 
 import javax.annotation.Nullable;
 
-public class PersistentPerson extends DataAccessPerson {
+public class PersistentDataPerson extends DataAccessPerson {
 
-    public PersistentPerson(Person person) {
+    public PersistentDataPerson(Person person) {
         super(person);
         PerNotia.injector.injectMembers(this);
     }
 
     @Inject
-    private PersonDao personDao;
+    private GeneralPersonDao generalPersonDao;
 
     /**
      * Fetches a value from the persistent datasource
@@ -28,7 +28,7 @@ public class PersistentPerson extends DataAccessPerson {
      */
     @ThreadBlocking
     public <K> K get(String field, Class<K> clazz) {
-        return personDao.get(person, field, clazz);
+        return generalPersonDao.get(person, field, clazz);
     }
 
     /**
@@ -39,6 +39,6 @@ public class PersistentPerson extends DataAccessPerson {
      */
     @ThreadBlocking
     public void set(String field, @Nullable Object value) {
-        personDao.update(person, field, value);
+        generalPersonDao.update(person, field, value);
     }
 }

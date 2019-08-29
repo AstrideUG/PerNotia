@@ -67,12 +67,10 @@
                 <configuration>
                     <createDependencyReducedPom>true</createDependencyReducedPom>
                     <relocations>
-                        <!-->
                         <relocation>
-                            <pattern>de.helight.sinus</pattern>
-                            <shadedPattern>${project.groupId}.${project.artifactId}.ints</shadedPattern>
+                            <pattern>me.helight.ccom</pattern>
+                            <shadedPattern>${project.groupId}.${project.artifactId}.utils</shadedPattern>
                         </relocation>
-                        <!-->
                     </relocations>
                     <filters>
                         <filter>
@@ -135,16 +133,9 @@
         </dependency>
 
         <dependency>
-            <groupId>org.mongodb</groupId>
-            <artifactId>mongodb-driver-sync</artifactId>
-            <version>3.10.2</version>
-            <scope>compile</scope>
-        </dependency>
-
-        <dependency>
             <groupId>me.helight</groupId>
             <artifactId>c-com</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.1.0-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
 

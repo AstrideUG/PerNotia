@@ -37,8 +37,16 @@ public abstract class DataAccessPerson extends ForwardingObject {
         return Encodings.HEX.decodePojo(encoded, Hash.class);
     }
 
+    public void storePojo(String field, Object value) {
+        set(field, Encodings.BASE64.encodePojo(value));
+    }
+
+    public <K> K getPojo(String field, Class<K>clazz) {
+        return Encodings.BASE64.decodePojo(get(field, String.class), clazz);
+    }
+
     @Override
-    protected Object delegate() {
+    public Object delegate() {
         return person;
     }
 }

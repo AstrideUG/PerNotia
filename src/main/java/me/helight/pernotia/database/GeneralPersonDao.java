@@ -1,40 +1,73 @@
 package me.helight.pernotia.database;
 
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
+import me.helight.ccom.bson.conversions.Bson;
 import me.helight.ccom.config.Config;
 import me.helight.ccom.config.ConfigBuilder;
 import me.helight.ccom.config.defaults.SimpleMongoConfig;
 import me.helight.ccom.database.MongoConnector;
-import me.helight.ccom.info.NoAPI;
 import me.helight.ccom.info.ThreadBlocking;
+import me.helight.ccom.mongo.client.MongoCollection;
+import me.helight.ccom.mongo.client.MongoIterable;
+import me.helight.ccom.mongo.client.model.Filters;
+import me.helight.ccom.mongo.client.model.Updates;
+import me.helight.pernotia.PerNotia;
 import me.helight.pernotia.common.SimpleDao;
-import org.bson.conversions.Bson;
+import me.helight.pernotia.configuration.PerNotiaConfiguration;
+import me.helight.pernotia.security.Hash;
+import me.helight.pernotia.security.HashSafety;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
-public class PersonDao implements SimpleDao<Person> {
+public class GeneralPersonDao implements SimpleDao<Person> {
 
     private MongoCollection<Person> collection;
     private MongoConnector mongoConnector;
 
-    public PersonDao() {
-        init();
+    public GeneralPersonDao() {
+        PerNotia.POOL.execute(this::init);
     }
 
     @SuppressWarnings("unchecked")
-    private void init() {
+    public void init() {
+        Config<PerNotiaConfiguration> configurationConfig = new ConfigBuilder()
+                .setClass(PerNotiaConfiguration.class)
+                .setDefault(PerNotiaConfiguration.DEFAULT)
+                .setSubfolder("plugins/PerNotia")
+                .setFilename("pernotia.json")
+                .build();
+        PerNotiaConfiguration configuration = configurationConfig.read();
+
         Config<SimpleMongoConfig> config = new ConfigBuilder<SimpleMongoConfig>()
                 .setClass(SimpleMongoConfig.class)
-                .setSubfolder("plugins/PetNotia/")
+                .setSubfolder("plugins/PerNotia/")
                 .setFilename("mongoCredentials.json")
                 .setDefault(SimpleMongoConfig.DEFAULT)
                 .build();
         SimpleMongoConfig mongoConfig = config.read();
         mongoConnector = MongoConnector.dispense(mongoConfig);
-        collection = mongoConnector.getMongoDatabase().getCollection("pernotia", Person.class);
+
+        if (mongoConnector == null) {
+            throw new IllegalStateException("MongoConnector could not be instantiated");
+        }
+
+        if (mongoConnector.getMongoDatabase() == null) {
+            throw new IllegalStateException("MongoDatabase could not be loaded");
+        }
+
+        MongoIterable<String> strings = mongoConnector.getMongoDatabase().listCollectionNames();
+        if (strings == null) {
+            System.out.println("Result returned is null");
+            return;
+        }
+        List<String> collections = strings.into(new ArrayList<>());
+
+        if (!collections.contains(configuration.getMongoCollection())) {
+            mongoConnector.getMongoDatabase().createCollection(configuration.getMongoCollection());
+        }
+
+        collection = mongoConnector.getMongoDatabase().getCollection(configuration.getMongoCollection(), Person.class);
     }
 
     public void reconnect() {
@@ -71,6 +104,7 @@ public class PersonDao implements SimpleDao<Person> {
 
     @ThreadBlocking
     public void changeName(String uuid, String name) {
+        collection.updateMany(Filters.eq("name", name), Updates.set("name","#"+ Hash.generateHash(ThreadLocalRandom.current().nextLong()+"", HashSafety.WEAK).getHash()));
         collection.updateMany(Filters.eq("uuid", uuid), Updates.set("name", name));
     }
 
@@ -102,6 +136,16 @@ public class PersonDao implements SimpleDao<Person> {
 
     private Bson toBson(Person person) {
         return Filters.and(Filters.eq("uuid",person.getUuid()), Filters.eq("name", person.getName()));
+    }
+
+    @ThreadBlocking
+    public Person getPersonByName(String name) {
+        return collection.find(Filters.eq("name", name)).first();
+    }
+
+    @ThreadBlocking
+    public Person getPersonByUUID(String uuid) {
+        return collection.find(Filters.eq("uuid", uuid)).first();
     }
 
 }
