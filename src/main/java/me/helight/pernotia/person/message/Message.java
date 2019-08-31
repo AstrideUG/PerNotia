@@ -7,8 +7,8 @@ import java.io.*;
 
 @AllArgsConstructor
 @Getter
-public class Disconnect implements Serializable {
+public class Message implements Serializable {
 
-    private String message;
+    private String value;
 
 }

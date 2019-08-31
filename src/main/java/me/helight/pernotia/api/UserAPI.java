@@ -1,7 +1,9 @@
 package me.helight.pernotia.api;
 
+import me.helight.ccom.concurrency.EventManager;
 import me.helight.ccom.info.ThreadBlocking;
 import me.helight.pernotia.PerNotia;
+import me.helight.pernotia.api.events.PlayerReadyEvent;
 import me.helight.pernotia.database.GeneralPersonDao;
 import me.helight.pernotia.database.Person;
 
@@ -28,6 +30,10 @@ public class UserAPI {
             default:
                 throw new IllegalArgumentException("Exists Call returned unexpected value");
         }
+    }
+
+    public static EventManager<PlayerReadyEvent> readyEventManager() {
+        return PerNotia.injector.getInstance(PerNotia.class).getReadyManager();
     }
 
     public static GeneralPersonDao getGeneralDAO() {

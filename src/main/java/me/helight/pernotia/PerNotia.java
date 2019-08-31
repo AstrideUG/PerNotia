@@ -8,10 +8,19 @@ import com.sun.net.httpserver.Filter;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import me.helight.ccom.collections.Pair;
+import me.helight.ccom.collections.Quartet;
+import me.helight.ccom.collections.Triplet;
+import me.helight.ccom.collections.Tuple;
 import me.helight.ccom.concurrency.Chain;
+import me.helight.ccom.concurrency.Environment;
+import me.helight.ccom.concurrency.EventManager;
 import me.helight.ccom.concurrency.chain.EnvAdrr;
 import me.helight.ccom.concurrency.chain.objectives.FunctionObjective;
+import me.helight.ccom.concurrency.event.Listener;
 import me.helight.pernotia.api.UserAPI;
+import me.helight.pernotia.api.events.PlayerReadyEvent;
+import me.helight.pernotia.chains.RegisterChain;
 import me.helight.pernotia.database.Person;
 import me.helight.pernotia.database.GeneralPersonDao;
 import me.helight.pernotia.logging.Log;
@@ -19,16 +28,16 @@ import me.helight.pernotia.modules.CommonModule;
 import me.helight.pernotia.person.MessagePerson;
 import me.helight.pernotia.person.data.SpecificPerson;
 import me.helight.pernotia.person.message.Disconnect;
+import me.helight.pernotia.person.message.Message;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.listener.MessageListener;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static jdk.nashorn.internal.runtime.regexp.joni.Config.log;
 
 @RequiredArgsConstructor
 public abstract class PerNotia {
@@ -50,7 +59,13 @@ public abstract class PerNotia {
     @Inject
     private GeneralPersonDao generalPersonDao;
 
+    @Getter
     private Map<UUID, List<Integer>> redisMessageListeners = new ConcurrentHashMap<>();
+
+    @Getter
+    private EventManager<PlayerReadyEvent> readyManager = new EventManager<>();
+
+    private Chain registerChain = new RegisterChain();
 
     public final void hook() {
         injector = Guice.createInjector(new CommonModule(this));
@@ -58,6 +73,11 @@ public abstract class PerNotia {
         injector.injectMembers(generalPersonDao);
         generalPersonDao.init();
         injector.injectMembers(loginVerify);
+
+        readyManager.registerListener(playerReadyEvent -> {
+            MessagePerson messagePerson = new MessagePerson(playerReadyEvent.getPerson());
+            messagePerson.sendMessage("§aDeine Daten wurden geladen");
+        });
     }
 
     public void handleInvalidUuid(Person person) {
@@ -68,41 +88,9 @@ public abstract class PerNotia {
     }
 
     public final void handleRegister(Person person) {
-        Log log = new Log();
-        POOL.execute(() -> {
-            Chain chain = Chain.create()
-                    .env("person", person)
-                    .runnable(log::start)
-                    .consume(p -> generalPersonDao.save(((Person) p).clone()), EnvAdrr.from("person"))
-                    .consume(p -> generalPersonDao.update((Person) p, "firstLogin", System.currentTimeMillis()), EnvAdrr.from("person"))
-                    .consume(p  -> generalPersonDao.update((Person) p, "token", UUID.randomUUID().toString()), EnvAdrr.from("person"))
-                    .function(p -> generalPersonDao.get((Person) p, "firstLogin", Long.class).toString(), EnvAdrr.from("person"))
-                    .function(p -> generalPersonDao.get((Person) p, "token", String.class), EnvAdrr.from("person"))
-                    .consume(a -> {
-                        ArrayList list = (ArrayList) a;
-                        log.print(
-                                "Registering " + ((Person)list.get(2)).toString(),
-                                "First Login: " + list.get(0).toString(),
-                                "Unique Token: " + list.get(1).toString()
-                        );
-                    }, EnvAdrr.from(4), EnvAdrr.from(5), EnvAdrr.from("person"))
-                    .runnable(() -> log.print("", "Testing API..."))
-                    .addObjective(new FunctionObjective(p -> UserAPI.getPerson(((Person)p).getName()), EnvAdrr.from("person")).exportNamed("ApiPerson"))
-                    .consume(u -> log.print("ApiPerson: " + u.toString()), EnvAdrr.from("ApiPerson"))
-                    .consume(l -> {
-                        ArrayList<Person> list = (ArrayList<Person>) l;
-                        log.print(
-                                "Valid Data: " + (list.get(0).isValid() && list.get(1).isValid()),
-                                "Similar Data: " + (list.get(0).getUuid().equals(list.get(1).getUuid()) && list.get(0).getName().equals(list.get(1).getName())),
-                                "_id availability: " + (!list.get(0).fromDB() && list.get(1).fromDB())
-                        );
-                    }, EnvAdrr.from("person"), EnvAdrr.from("ApiPerson"))
-                    .runnable(log::finish);
-            chain.runAsync();
-        });
-
-
-
+        Environment env = new Environment();
+        env.put("person", person);
+        registerChain.run(env);
     }
 
     public void nameChanged(Person person) {
@@ -117,31 +105,26 @@ public abstract class PerNotia {
     }
 
     public final void handleConnect(Person person) {
-        loginVerify.verify(person);
-
-        List<Integer> ids = new ArrayList<>();
-        redisMessageListeners.put(UUID.fromString(person.getUuid()), ids);
-
         POOL.execute(() -> {
-            MessagePerson messagePerson = new MessagePerson(person);
-            messagePerson.addListener(Disconnect.class, new MessageListener<Disconnect>() {
-                @Override
-                public void onMessage(CharSequence channel, Disconnect msg) {
-                    SpecificPerson.get(person).disconnect(msg.getMessage());
-                }
-            });
+            LoginVerify.VerificationResult result = loginVerify.verify(person);
 
-            messagePerson.addListener(Disconnect.class, new MessageListener<Disconnect>() {
-                @Override
-                public void onMessage(CharSequence channel, Disconnect msg) {
-                    SpecificPerson.get(person).disconnect(msg.getMessage());
-                }
-            });
+            List<Integer> ids = new ArrayList<>();
+            redisMessageListeners.put(UUID.fromString(person.getUuid()), ids);
+
+            MessagePerson messagePerson = new MessagePerson(person);
+            messagePerson.addListenerTemp(Disconnect.class, (channel, msg) -> SpecificPerson.get(person).disconnect(msg.getMessage()));
+            messagePerson.addListenerTemp(Message.class, (channel, msg) -> SpecificPerson.get(person).sendMessage(msg.getValue()));
+
+            readyManager.broadcast(new PlayerReadyEvent(person,result));
         });
     }
 
     public void handleDisconnect(Person person) {
-
+        MessagePerson messagePerson = new MessagePerson(person);
+        for (int id : redisMessageListeners.get(UUID.fromString(person.getUuid()))) {
+            messagePerson.removeListener(id);
+        }
+        redisMessageListeners.remove(UUID.fromString(person.getUuid()));
     }
 
     public void handleVerifyError(Person person) {
@@ -149,6 +132,7 @@ public abstract class PerNotia {
     }
 
 
+    @Deprecated
     public abstract void sendMessage(Person person, String message);
 
 }

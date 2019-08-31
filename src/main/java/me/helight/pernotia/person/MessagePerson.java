@@ -2,17 +2,17 @@ package me.helight.pernotia.person;
 
 import com.google.common.collect.ForwardingObject;
 import com.google.inject.Inject;
-import lombok.NonNull;
 import me.helight.ccom.info.ThreadBlocking;
 import me.helight.pernotia.PerNotia;
 import me.helight.pernotia.configuration.PerNotiaConfiguration;
 import me.helight.pernotia.database.Person;
 import me.helight.pernotia.person.message.Disconnect;
-import me.helight.pernotia.person.message.RawMessage;
+import me.helight.pernotia.person.message.Message;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.listener.MessageListener;
-import org.redisson.api.listener.StatusListener;
+
+import java.util.UUID;
 
 public class MessagePerson extends ForwardingObject {
 
@@ -20,6 +20,9 @@ public class MessagePerson extends ForwardingObject {
 
     @Inject
     private RedissonClient redissonClient;
+
+    @Inject
+    private PerNotia perNotia;
 
     @Inject
     private PerNotiaConfiguration configuration;
@@ -41,9 +44,25 @@ public class MessagePerson extends ForwardingObject {
         return getTopic().addListener(clazz, messageListener);
     }
 
+    /**
+     * Adds a Listener which will be unregistered, when the player disconnects
+     * @return ID of the Listener
+     */
+    @ThreadBlocking
+    public <K> int addListenerTemp(Class<K> clazz, MessageListener<K> messageListener) {
+        if (perNotia.getRedisMessageListeners().containsKey(UUID.fromString(person.getUuid()))) {
+            int i = getTopic().addListener(clazz, messageListener);
+            perNotia.getRedisMessageListeners().get(UUID.fromString(person.getUuid())).add(i);
+            return i;
+        } else {
+            return -1;
+        }
+    }
+
+
     @ThreadBlocking
     public void removeListener(int id) {
-        getTopic().removeListener(id);
+        getTopic().removeListenerAsync(id);
     }
 
     @ThreadBlocking
@@ -51,10 +70,14 @@ public class MessagePerson extends ForwardingObject {
         getTopic().removeListener(messageListener);
     }
 
-    @ThreadBlocking
     public void disconnect(String message) {
         Disconnect disconnect = new Disconnect(message);
         getTopic().publishAsync(disconnect);
+    }
+
+    public void sendMessage(String message) {
+        Message msg = new Message(message);
+        getTopic().publishAsync(msg);
     }
 
     @Override

@@ -33,25 +33,25 @@ public class LoginVerify {
     }
 
     @ThreadBlocking
-    public void verify(Person person) {
-        PerNotia.POOL.execute(() -> {
-            switch (check(person)) {
-                case NOT_REGISTERED:
-                    perNotia.handleRegister(person);
-                    break;
-                case INVALID_UUID:
-                    perNotia.handleInvalidUuid(person);
-                    perNotia.handleRegister(person);
-                    generalPersonDao.changeName(person.getUuid(), person.getName());
-                    break;
-                case CHANGED_NAME:
-                    generalPersonDao.changeName(person.getUuid(), person.getName());
-                    break;
-                default:
-                    perNotia.successfulLogin(person);
-                    break;
-            }
-        });
+    public VerificationResult verify(Person person) {
+        switch (check(person)) {
+            case NOT_REGISTERED:
+                perNotia.handleRegister(person);
+                return VerificationResult.NOT_REGISTERED;
+            case INVALID_UUID:
+                perNotia.handleInvalidUuid(person);
+                perNotia.handleRegister(person);
+                generalPersonDao.changeName(person.getUuid(), person.getName());
+                perNotia.nameChanged(person);
+                return VerificationResult.INVALID_UUID;
+            case CHANGED_NAME:
+                generalPersonDao.changeName(person.getUuid(), person.getName());
+                perNotia.nameChanged(person);
+                return VerificationResult.CHANGED_NAME;
+            default:
+                perNotia.successfulLogin(person);
+                return VerificationResult.PASS;
+        }
     }
 
     public enum VerificationResult {
