@@ -68,7 +68,7 @@
                     <createDependencyReducedPom>true</createDependencyReducedPom>
                     <relocations>
                         <relocation>
-                            <pattern>me.helight.ccom</pattern>
+                            <pattern>me.helight.c-com</pattern>
                             <shadedPattern>${project.groupId}.${project.artifactId}.utils</shadedPattern>
                         </relocation>
                     </relocations>
