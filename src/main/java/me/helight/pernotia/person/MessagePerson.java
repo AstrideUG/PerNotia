@@ -2,6 +2,7 @@ package me.helight.pernotia.person;
 
 import com.google.common.collect.ForwardingObject;
 import com.google.inject.Inject;
+import lombok.experimental.Wither;
 import me.helight.ccom.info.ThreadBlocking;
 import me.helight.pernotia.PerNotia;
 import me.helight.pernotia.configuration.PerNotiaConfiguration;
@@ -34,6 +35,13 @@ public class MessagePerson extends ForwardingObject {
 
     private RTopic getTopic() {
         return redissonClient.getTopic(configuration.getRedisMapPrefix() + "pubsub_" + person.getUuid());
+    }
+
+    /**
+     * Publishes a object to all servers
+     */
+    public <K> void publish(K object) {
+        getTopic().publishAsync(object);
     }
 
     /**
