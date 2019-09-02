@@ -73,11 +73,6 @@ public abstract class PerNotia {
         injector.injectMembers(generalPersonDao);
         generalPersonDao.init();
         injector.injectMembers(loginVerify);
-
-        readyManager.registerListener(playerReadyEvent -> {
-            MessagePerson messagePerson = new MessagePerson(playerReadyEvent.getPerson());
-            messagePerson.sendMessage("§aDeine Daten wurden geladen");
-        });
     }
 
     public void handleInvalidUuid(Person person) {
