@@ -28,7 +28,7 @@ public class UserAPI {
             case 2:
                 return dao.getPersonByName(player);
             default:
-                throw new IllegalArgumentException("Exists Call returned unexpected value");
+                throw new IllegalArgumentException("Exists-Call returned unexpected value");
         }
     }
 
